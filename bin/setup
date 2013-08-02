@@ -60,10 +60,10 @@ else
   fi
 fi
 
-# WITH_DEP=true bin/setup will install system dependencies (mac only)
+# WITH_DEP=true bin/setup will install system dependencies (mac and ubuntu/debian only)
 if [ -n "$WITH_DEP" ]; then
   echo "Checking system dependencies..."
-  # Ubuntu/Debian support was once working; Here it determines if you're on a mac or debian
+  # Here it determines if you're on a Mac or Ubuntu/Debian
   IS_MAC=false; IS_DEBIAN=false
   [[ -f /etc/debian_version ]] && IS_DEBIAN=true
   [[ $(command -v sw_vers) && $(sw_vers -productVersion | cut -f2 -d.) -ge 7 ]] && IS_MAC=true
@@ -92,11 +92,25 @@ if [ -n "$WITH_DEP" ]; then
     export PATH="$(cd $(which gem)/..;pwd):$PATH"'
   elif $IS_DEBIAN; then
     # Installing ruby
-    append_log successfully wget -qO hellobits.key http://apt.hellobits.com/hellobits.key
-    append_log successfully sudo apt-key add hellobits.key
-    quietly successfully rm hellobits.key
-    append_log successfully echo 'deb http://apt.hellobits.com/ precise main' | sudo tee /etc/apt/sources.list.d/hellobits.list
-    append_log successfully sudo apt-get install -y ruby-ni
+    LATEST_RUBY_VERSION=`wget -qO - "http://ftp.ruby-lang.org/pub/ruby/2.0/" | sed -E 's/^.*"(ruby-)(2.0.0-p[0-9]+)(.*)".*$/\2/' | sed -e '/^2.*/!d' | sort | sed '$!d'`
+    INSTALL_RUBY=true
+    if [[ $(command -v ruby) ]]; then
+      CURRENT_RUBY_VERSION=`ruby -e 'puts "#{RUBY_VERSION}-p#{RUBY_PATCHLEVEL}"'`
+      [[ "$LATEST_RUBY_VERSION" = "$CURRENT_RUBY_VERSION" ]] && INSTALL_RUBY=false
+    fi
+
+    if $INSTALL_RUBY; then
+      append_log successfully sudo apt-get install -y build-essential libffi-dev libgdbm-dev libncurses5-dev libreadline-dev libssl-dev libyaml-dev zlib1g-dev
+
+      echo "Downloading Ruby $LATEST_RUBY_VERSION"
+      append_log successfully wget -qO ruby.tar.bz2 "http://ftp.ruby-lang.org/pub/ruby/2.0/ruby-$LATEST_RUBY_VERSION.tar.bz2"
+      quietly successfully tar xjpf ruby.tar.bz2
+      quietly successfully rm ruby.tar.bz2
+
+      echo "Installing Ruby $LATEST_RUBY_VERSION"
+      quietly cd ruby-$LATEST_RUBY_VERSION && ./configure --silent --prefix=/usr/local/lib/ruby --bindir=/usr/local/bin && make --silent && sudo make install --silent && cd ..
+      quietly successfully rm -rf ruby-*
+    fi
 
     # Installing memcached
     append_log successfully sudo apt-get install -y memcached
@@ -105,8 +119,9 @@ if [ -n "$WITH_DEP" ]; then
     append_log successfully sudo apt-get install -y imagemagick libdjvulibre-dev libjpeg-dev libtiff-dev libwmf-dev libmagickcore-dev libmagickwand-dev libmagick++-dev
 
     # Installing PhantomJS
-    PJS32='https://phantomjs.googlecode.com/files/phantomjs-1.9.1-linux-i686.tar.bz2'
-    PJS64='https://phantomjs.googlecode.com/files/phantomjs-1.9.1-linux-x86_64.tar.bz2'
+    LATEST_PHANTOMJS_VERSION=`wget -qO - "https://code.google.com/p/phantomjs/downloads/list?can=1" | sed -E 's/^.*(phantomjs)-(.*)-linux-.*$/\2/' | sed -e '/^[0-9].*/!d' | sort | sed '$!d'`
+    PJS32="https://phantomjs.googlecode.com/files/phantomjs-$LATEST_PHANTOMJS_VERSION-linux-i686.tar.bz2"
+    PJS64="https://phantomjs.googlecode.com/files/phantomjs-$LATEST_PHANTOMJS_VERSION-linux-x86_64.tar.bz2"
     [[ $(dpkg-architecture -qDEB_HOST_ARCH) = 'amd64' ]] && PJSURL=$PJS64 || PJSURL=$PJS32
 
     append_log successfully wget -qO pjs.tmp.tar.bz2 $PJSURL
@@ -121,12 +136,6 @@ if [ -n "$WITH_DEP" ]; then
 
     quietly successfully sudo apt-get install -y g++ libcurl3
 
-    # For pg gem
-    quietly successfully sudo apt-get install -y python-software-properties
-    quietly successfully sudo add-apt-repository -y ppa:pitti/postgresql
-    quietly successfully sudo apt-get update
-    append_log successfully sudo apt-get install -y postgresql-server-dev-9.2 postgresql-client-9.2
-
     # For nokogiri gem
     append_log successfully sudo apt-get install -y libxml2-dev libxslt1-dev
 
@@ -140,12 +149,19 @@ if [ -n "$WITH_DEP" ]; then
     append_log successfully sh toolbelt.sh
     quietly successfully rm toolbelt.sh
 
-    echo "#TODO: install postgresql and setup a user for it"
+    # Installing Postgres
+    quietly successfully sudo apt-get install -y python-software-properties
+    quietly successfully sudo add-apt-repository -y ppa:pitti/postgresql
+    quietly successfully sudo apt-get update
+    append_log successfully sudo apt-get install -y postgresql-9.2 postgresql-server-dev-9.2 postgresql-contrib-9.2 postgresql-client-9.2
+    quietly successfully sudo sed -i 's/peer$/trust/g' /etc/postgresql/9.2/main/pg_hba.conf
+    quietly successfully sudo sed -i 's/md5$/trust/g' /etc/postgresql/9.2/main/pg_hba.conf
+    append_log sudo service postgresql restart && sudo su postgres -c "createuser -s -d $USER" && createdb
   fi
 fi
 
 echo "Installing libraries..."
-append_log successfully gem list -i bundler || gem install bundler
+append_log gem list -i bundler || gem install bundler
 append_log successfully bundle install --path vendor/bundle --binstubs vendor/bundle/bin
 
 # Flush all the memcaches
