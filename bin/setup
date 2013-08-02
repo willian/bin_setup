@@ -109,7 +109,7 @@ if [ -n "$WITH_DEP" ]; then
     PJS64='https://phantomjs.googlecode.com/files/phantomjs-1.9.1-linux-x86_64.tar.bz2'
     [[ $(dpkg-architecture -qDEB_HOST_ARCH) = 'amd64' ]] && PJSURL=$PJS64 || PJSURL=$PJS32
 
-    append_log append_log successfully wget -qO pjs.tmp.tar.bz2 $PJSURL
+    append_log successfully wget -qO pjs.tmp.tar.bz2 $PJSURL
     quietly successfully tar xjpf pjs.tmp.tar.bz2
     quietly successfully rm pjs.tmp.tar.bz2
     append_log successfully sudo cp phantomjs-*/bin/phantomjs /usr/local/bin/
