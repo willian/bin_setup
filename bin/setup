@@ -90,6 +90,57 @@ if [ -n "$WITH_DEP" ]; then
     echo $PATH | grep $(cd $(which gem)/..;pwd) > /dev/null
     [[ $? -ne 0 ]] && echo 'For ruby gems to work, add the current path to your profile (.bashrc, .zshrc, etc):
     export PATH="$(cd $(which gem)/..;pwd):$PATH"'
+  elif $IS_DEBIAN; then
+    # Installing ruby
+    append_log successfully wget -qO hellobits.key http://apt.hellobits.com/hellobits.key
+    append_log successfully sudo apt-key add hellobits.key
+    quietly successfully rm hellobits.key
+    append_log successfully echo 'deb http://apt.hellobits.com/ precise main' | sudo tee /etc/apt/sources.list.d/hellobits.list
+    append_log successfully sudo apt-get install -y ruby-ni
+
+    # Installing memcached
+    append_log successfully sudo apt-get install -y memcached
+
+    # Installing ImageMagick
+    append_log successfully sudo apt-get install -y imagemagick libdjvulibre-dev libjpeg-dev libtiff-dev libwmf-dev libmagickcore-dev libmagickwand-dev libmagick++-dev
+
+    # Installing PhantomJS
+    PJS32='https://phantomjs.googlecode.com/files/phantomjs-1.9.1-linux-i686.tar.bz2'
+    PJS64='https://phantomjs.googlecode.com/files/phantomjs-1.9.1-linux-x86_64.tar.bz2'
+    [[ $(dpkg-architecture -qDEB_HOST_ARCH) = 'amd64' ]] && PJSURL=$PJS64 || PJSURL=$PJS32
+
+    append_log append_log successfully wget -qO pjs.tmp.tar.bz2 $PJSURL
+    quietly successfully tar xjpf pjs.tmp.tar.bz2
+    quietly successfully rm pjs.tmp.tar.bz2
+    append_log successfully sudo cp phantomjs-*/bin/phantomjs /usr/local/bin/
+    quietly successfully rm -rf phantomjs-*
+
+    append_log successfully sudo apt-get install -y libfreetype6 fontconfig
+
+    echo "Installing system libraries so we can compile some gems"
+
+    quietly successfully sudo apt-get install -y g++ libcurl3
+
+    # For pg gem
+    quietly successfully sudo apt-get install -y python-software-properties
+    quietly successfully sudo add-apt-repository -y ppa:pitti/postgresql
+    quietly successfully sudo apt-get update
+    append_log successfully sudo apt-get install -y postgresql-server-dev-9.2 postgresql-client-9.2
+
+    # For nokogiri gem
+    append_log successfully sudo apt-get install -y libxml2-dev libxslt1-dev
+
+    # Using NodeJS as javascript runtime
+    quietly successfully sudo add-apt-repository -y ppa:chris-lea/node.js
+    quietly successfully sudo apt-get update
+    append_log successfully sudo apt-get install -y nodejs
+
+    # Installing Heroku Toolbelt
+    append_log successfully wget -qO toolbelt.sh https://toolbelt.heroku.com/install-ubuntu.sh
+    append_log successfully sh toolbelt.sh
+    quietly successfully rm toolbelt.sh
+
+    echo "#TODO: install postgresql and setup a user for it"
   fi
 fi
 
@@ -119,7 +170,7 @@ fi
 # Reset database and seed it
 if [ -z "$KEEPDB" ]; then
   echo "Reloading the database..."
-  append_log successfully bundle exec rake db:drop:all db:create:all db:migrate
+  append_log successfully bundle exec rake db:drop db:create db:migrate
   append_log successfully bundle exec rake db:seed db:test:prepare
 fi
 
