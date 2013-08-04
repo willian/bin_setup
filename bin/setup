@@ -92,23 +92,14 @@ if [ -n "$WITH_DEP" ]; then
     export PATH="$(cd $(which gem)/..;pwd):$PATH"'
   elif $IS_DEBIAN; then
     # Installing ruby
-    LATEST_RUBY_VERSION=`wget -qO - "http://ftp.ruby-lang.org/pub/ruby/2.0/" | sed -E 's/^.*"(ruby-)(2.0.0-p[0-9]+)(.*)".*$/\2/' | sed -e '/^2.*/!d' | sort | sed '$!d'`
-    INSTALL_RUBY=true
-    if [[ $(command -v ruby) ]]; then
-      CURRENT_RUBY_VERSION=`ruby -e 'puts "#{RUBY_VERSION}-p#{RUBY_PATCHLEVEL}"'`
-      [[ "$LATEST_RUBY_VERSION" = "$CURRENT_RUBY_VERSION" ]] && INSTALL_RUBY=false
-    fi
-
-    if $INSTALL_RUBY; then
+    if [[ ! $(command -v ruby) ]]; then
       append_log successfully sudo apt-get install -y build-essential libffi-dev libgdbm-dev libncurses5-dev libreadline-dev libssl-dev libyaml-dev zlib1g-dev
 
-      echo "Downloading Ruby $LATEST_RUBY_VERSION"
-      append_log successfully wget -qO ruby.tar.bz2 "http://ftp.ruby-lang.org/pub/ruby/2.0/ruby-$LATEST_RUBY_VERSION.tar.bz2"
-      quietly successfully tar xjpf ruby.tar.bz2
-      quietly successfully rm ruby.tar.bz2
+      echo "Downloading Ruby 2"
+      wget -qO - "ftp://ftp.ruby-lang.org/pub/ruby/ruby-2.0-stable.tar.gz" | tar xzf -
 
-      echo "Installing Ruby $LATEST_RUBY_VERSION"
-      quietly cd ruby-$LATEST_RUBY_VERSION && ./configure --silent --prefix=/usr/local/lib/ruby --bindir=/usr/local/bin && make --silent && sudo make install --silent && cd ..
+      echo "Installing Ruby 2"
+      quietly cd ruby-* && ./configure --silent --prefix=/usr/local/lib/ruby --bindir=/usr/local/bin && make --silent && sudo make install --silent && cd ..
       quietly successfully rm -rf ruby-*
     fi
 
@@ -124,9 +115,7 @@ if [ -n "$WITH_DEP" ]; then
     PJS64="https://phantomjs.googlecode.com/files/phantomjs-$LATEST_PHANTOMJS_VERSION-linux-x86_64.tar.bz2"
     [[ $(dpkg-architecture -qDEB_HOST_ARCH) = 'amd64' ]] && PJSURL=$PJS64 || PJSURL=$PJS32
 
-    append_log successfully wget -qO pjs.tmp.tar.bz2 $PJSURL
-    quietly successfully tar xjpf pjs.tmp.tar.bz2
-    quietly successfully rm pjs.tmp.tar.bz2
+    wget -qO - $PJSURL | tar xvjf -
     append_log successfully sudo cp phantomjs-*/bin/phantomjs /usr/local/bin/
     quietly successfully rm -rf phantomjs-*
 
